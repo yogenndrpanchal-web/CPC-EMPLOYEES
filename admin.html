@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>CPC Employees — Admin</title>
+<style>
+  :root{
+    --ink:#15140F; --paper:#F5F2EA; --brass:#B08D4E; --brass-dark:#8A6C36; --brass-light:#E4D6B4;
+    --line:#DDD6C4; --green:#3F6B4A; --green-bg:#E7EFE9; --red:#A8432F; --red-bg:#F3E9E6;
+    --muted:#8A8471; --card:#FFFFFF; --shadow:0 2px 10px rgba(21,20,15,.06);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--paper); color:var(--ink); font-family:'Iowan Old Style','Georgia',serif; min-height:100vh; -webkit-font-smoothing:antialiased;}
+  .util{font-family:'Courier New',monospace; letter-spacing:.04em;}
+
+  header{ padding:18px 18px 12px; border-bottom:2px solid var(--ink); display:flex; align-items:flex-start; justify-content:space-between;}
+  header .brand{ font-size:22px; font-weight:700;}
+  header .brand span{ color:var(--brass-dark);}
+  header .tagline{ font-size:10px; letter-spacing:.14em; color:var(--muted); margin-top:2px;}
+  header .adminLink{ font-family:'Courier New',monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); background:none; border:1px solid var(--line); padding:6px 10px; border-radius:2px; cursor:pointer;}
+
+  nav{ display:flex; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--paper); position:sticky; top:0; z-index:5; -webkit-overflow-scrolling:touch;}
+  nav::-webkit-scrollbar{ display:none;}
+  nav button{ flex:0 0 auto; padding:12px 13px; background:none; border:none; font-family:'Courier New',monospace; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap;}
+  nav button.active{ color:var(--ink); border-bottom:3px solid var(--brass); font-weight:700;}
+
+  main{ max-width:560px; margin:0 auto; padding:16px 16px 60px;}
+  .view{ display:none;}
+  .view.active{ display:block;}
+
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:3px; padding:17px; margin-bottom:15px; box-shadow:var(--shadow);}
+  .eyebrow{ font-family:'Courier New',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--brass-dark); margin:0 0 6px;}
+  h2{ margin:0 0 4px; font-size:18px;}
+  p.hint{ color:var(--muted); font-size:12.5px; margin:4px 0 14px; line-height:1.5;}
+
+  label{ display:block; font-size:10.5px; color:var(--muted); margin:12px 0 5px; font-family:'Courier New',monospace; letter-spacing:.04em; text-transform:uppercase;}
+  input[type=text], input[type=tel], input[type=password], input[type=time], select, input[type=date], textarea{
+    width:100%; padding:10px 11px; border:1px solid var(--line); background:var(--paper); font-family:inherit; font-size:14.5px; border-radius:2px; color:var(--ink);
+  }
+  textarea{ resize:vertical; min-height:70px;}
+  input:focus, select:focus, textarea:focus{ outline:2px solid var(--brass); outline-offset:1px;}
+
+  .cam-wrap{ position:relative; width:100%; aspect-ratio:3/4; background:#000; border-radius:3px; overflow:hidden; margin-top:12px;}
+  video{ position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;}
+  .cam-frame{ position:absolute; inset:8%; border:2px dashed rgba(246,243,236,.55); border-radius:4px; pointer-events:none;}
+  .cam-status{ position:absolute; bottom:0; left:0; right:0; padding:9px 11px; background:linear-gradient(transparent, rgba(0,0,0,.65)); color:#fff; font-family:'Courier New',monospace; font-size:11.5px; min-height:18px;}
+
+  button.btn{ width:100%; padding:12px; border:none; border-radius:2px; font-family:'Courier New',monospace; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; margin-top:11px;}
+  .btn-primary{ background:var(--ink); color:var(--paper);}
+  .btn-primary:disabled{ background:var(--line); color:var(--muted); cursor:not-allowed;}
+  .btn-secondary{ background:transparent; color:var(--ink); border:1px solid var(--ink);}
+  .btn-accept{ background:var(--green); color:#fff;}
+  .btn-reject{ background:transparent; color:var(--red); border:1px solid var(--red);}
+  .btn-row{ display:flex; gap:8px;}
+  .btn-row .btn{ flex:1;}
+
+  .thumb-row{ display:flex; align-items:center; gap:12px; margin-top:12px;}
+  .thumb{ width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid var(--line); background:#eee;}
+
+  .emp-row{ display:flex; align-items:center; gap:11px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .emp-row:last-child{ border-bottom:none;}
+  .emp-row img{ width:38px; height:38px; border-radius:50%; object-fit:cover; border:1px solid var(--line);}
+  .emp-row .meta{ flex:1; min-width:0;}
+  .emp-row .meta .name{ font-weight:700; font-size:13.5px;}
+  .emp-row .meta .sub{ color:var(--muted); font-size:10.5px; font-family:'Courier New',monospace;}
+  .del-x{ background:none; border:none; color:var(--red); font-size:16px; cursor:pointer; padding:6px;}
+
+  .result-banner{ margin-top:12px; padding:12px; border-radius:2px; font-family:'Courier New',monospace; font-size:12.5px; display:none;}
+  .result-banner.in{ display:block; background:var(--green-bg); color:var(--green); border:1px solid var(--green);}
+  .result-banner.err{ display:block; background:#F0EEE6; color:var(--muted); border:1px solid var(--line);}
+
+  table{ width:100%; border-collapse:collapse; font-size:11.5px;}
+  th{ text-align:left; font-family:'Courier New',monospace; font-size:9px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding:6px 3px; border-bottom:1px solid var(--ink);}
+  td{ padding:7px 3px; border-bottom:1px solid var(--line); vertical-align:top;}
+  .tag{ font-family:'Courier New',monospace; font-size:9px; padding:2px 6px; border-radius:10px; display:inline-block;}
+  .tag.pending{ background:#FBF0DC; color:var(--brass-dark);}
+  .empty{ text-align:center; padding:24px 10px; color:var(--muted); font-size:12.5px;}
+
+  .loading-veil{ position:fixed; inset:0; background:var(--paper); z-index:90; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px;}
+  .spinner{ width:22px; height:22px; border:2px solid var(--line); border-top-color:var(--brass); border-radius:50%; animation:spin .8s linear infinite;}
+  @keyframes spin{ to{ transform:rotate(360deg);} }
+
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:9px;}
+  .stat-card{ background:var(--card); border:1px solid var(--line); border-radius:3px; padding:14px 12px; box-shadow:var(--shadow);}
+  .stat-card .num{ font-size:25px; font-weight:700; line-height:1;}
+  .stat-card .lbl{ font-family:'Courier New',monospace; font-size:9px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin-top:5px;}
+  .stat-card.accent .num{ color:var(--brass-dark);}
+  .stat-card.warn .num{ color:var(--red);}
+  .stat-card.good .num{ color:var(--green);}
+
+  .toggle-row{ display:flex; gap:7px; margin-bottom:12px; flex-wrap:wrap;}
+  .toggle-row button{ flex:1; min-width:70px; padding:8px; border:1px solid var(--ink); background:transparent; color:var(--ink); font-family:'Courier New',monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase; border-radius:2px; cursor:pointer;}
+  .toggle-row button.active{ background:var(--ink); color:var(--paper);}
+
+  .settings-block{ margin-bottom:20px; padding-bottom:18px; border-bottom:1px solid var(--line);}
+  .settings-block:last-child{ border-bottom:none;}
+
+  .search-row{ display:flex; gap:8px; margin-bottom:12px;}
+  .search-row input{ flex:1;}
+
+  .notice-card{ border:1px solid var(--line); border-radius:3px; padding:12px; margin-bottom:10px; background:var(--paper);}
+  .notice-card .msg{ font-size:13.5px; line-height:1.5;}
+  .notice-card img{ width:100%; border-radius:3px; margin-top:8px;}
+  .notice-card .meta{ font-family:'Courier New',monospace; font-size:9.5px; color:var(--muted); margin-top:6px;}
+  .notice-tag{ font-family:'Courier New',monospace; font-size:8.5px; padding:2px 6px; border-radius:8px; background:var(--brass-light); color:var(--brass-dark); margin-right:6px;}
+
+  .check-list{ max-height:220px; overflow-y:auto; border:1px solid var(--line); border-radius:2px; padding:8px; margin-top:8px;}
+  .check-item{ display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:13px;}
+  .check-item input{ width:auto;}
+
+  #loginScreen{ position:fixed; inset:0; z-index:100; background:var(--ink); display:flex; align-items:center; justify-content:center; padding:24px;}
+  .login-card{ width:100%; max-width:360px; background:var(--paper); border-radius:4px; padding:30px 24px; box-shadow:0 10px 40px rgba(0,0,0,.4);}
+  .login-brand{ text-align:center; margin-bottom:4px;}
+  .login-brand .name{ font-size:24px; font-weight:700;}
+  .login-brand .name span{ color:var(--brass-dark);}
+  .login-brand .tag{ font-size:10px; letter-spacing:.16em; color:var(--muted); margin-top:4px;}
+  .login-divider{ height:1px; background:var(--line); margin:18px 0;}
+  #loginError{ margin-top:12px; padding:10px 12px; border-radius:2px; background:var(--red-bg); color:var(--red); font-family:'Courier New',monospace; font-size:11.5px; display:none; text-align:center;}
+</style>
+</head>
+<body>
+
+<div id="veil" class="loading-veil" style="display:none;">
+  <div class="spinner"></div>
+  <div class="util" style="font-size:12px;color:var(--muted);">LOADING…</div>
+</div>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="name">CPC <span>EMPLOYEES</span></div>
+      <div class="tag util">ADMIN PANEL</div>
+    </div>
+    <div class="login-divider"></div>
+    <label for="loginUser">Username</label>
+    <input type="text" id="loginUser" autocomplete="username">
+    <label for="loginPass">Password</label>
+    <input type="password" id="loginPass" autocomplete="current-password">
+    <button class="btn btn-primary" id="loginBtn" style="margin-top:16px;">Sign In</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<div id="adminPanel" style="display:none;">
+  <header>
+    <div>
+      <div class="brand">CPC <span>EMPLOYEES</span></div>
+      <div class="tagline util">ADMIN PANEL</div>
+    </div>
+    <button class="adminLink" id="adminLogoutBtn">Log out</button>
+  </header>
+
+  <nav id="navBar">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="requests">Requests</button>
+    <button data-view="employees">Employees</button>
+    <button data-view="attendance">Attendance</button>
+    <button data-view="kharcha">Kharcha</button>
+    <button data-view="notices">Notices</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section class="view active" id="view-dashboard">
+      <div class="card">
+        <p class="eyebrow">Overview</p>
+        <h2>Today</h2>
+        <div class="stat-grid">
+          <div class="stat-card good"><div class="num" id="statPresent">0</div><div class="lbl">Present Today</div></div>
+          <div class="stat-card warn"><div class="num" id="statAbsent">0</div><div class="lbl">Absent Today</div></div>
+          <div class="stat-card accent"><div class="num" id="statLate">0</div><div class="lbl">Late Today</div></div>
+          <div class="stat-card"><div class="num" id="statKharcha">₹0</div><div class="lbl">Kharcha This Month</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Requests</p>
+        <h2 id="pendingCountHeading">Pending approvals</h2>
+        <div id="dashPendingList"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-requests">
+      <div class="card">
+        <p class="eyebrow">Approvals</p>
+        <h2>Pending employee requests</h2>
+        <div id="requestsList"><div class="empty">No pending requests.</div></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-employees">
+      <div class="card">
+        <p class="eyebrow">Directory</p>
+        <h2>All employees</h2>
+        <div id="empList"><div class="empty">No employees yet.</div></div>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Manual Add</p>
+        <h2>Add employee directly</h2>
+        <label for="regName">Full name</label>
+        <input type="text" id="regName" placeholder="e.g. Ramesh Kumar">
+        <label for="regMobile">Mobile number</label>
+        <input type="tel" id="regMobile" placeholder="e.g. 9876543210">
+        <label for="regDesignation">Designation (optional)</label>
+        <input type="text" id="regDesignation" placeholder="e.g. Technician">
+        <label for="regBranch">Branch</label>
+        <select id="regBranch"></select>
+        <label>Photo</label>
+        <div class="cam-wrap">
+          <video id="regVideo" autoplay muted playsinline></video>
+          <div class="cam-frame"></div>
+          <div class="cam-status" id="regStatus">Starting camera…</div>
+        </div>
+        <div class="thumb-row" id="regThumbRow" style="display:none;">
+          <img id="regThumb" class="thumb">
+          <div class="util" style="font-size:11px;color:var(--muted);">Photo captured.</div>
+        </div>
+        <button class="btn btn-secondary" id="regCaptureBtn" disabled>Capture Photo</button>
+        <button class="btn btn-primary" id="regSaveBtn" disabled>Save Employee</button>
+        <div id="regResult" class="result-banner"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-attendance">
+      <div class="card">
+        <p class="eyebrow">Attendance Sheet</p>
+        <h2>Records</h2>
+        <div class="toggle-row">
+          <button id="attTabDaily" class="active">Daily</button>
+          <button id="attTabWeekly">Weekly</button>
+          <button id="attTabMonthly">Monthly</button>
+        </div>
+        <div class="search-row">
+          <input type="date" id="attSearchDate">
+          <input type="text" id="attSearchText" placeholder="Name or mobile">
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Mobile</th><th>In</th><th>Out</th><th>IP</th></tr></thead>
+          <tbody id="attSheetBody"></tbody>
+        </table>
+        <button class="btn btn-secondary" id="attExportBtn">Export CSV</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-kharcha">
+      <div class="card">
+        <p class="eyebrow">Kharcha Sheet</p>
+        <h2>Records</h2>
+        <div class="toggle-row">
+          <button id="khTabDaily" class="active">Daily</button>
+          <button id="khTabWeekly">Weekly</button>
+          <button id="khTabMonthly">Monthly</button>
+        </div>
+        <div class="search-row">
+          <input type="date" id="khSearchDate">
+          <input type="text" id="khSearchText" placeholder="Name or mobile">
+        </div>
+        <div class="util" id="khTotal" style="font-size:12px;margin-bottom:10px;"></div>
+        <table>
+          <thead><tr><th>Name</th><th>Mobile</th><th>Item</th><th>Qty</th><th>₹</th></tr></thead>
+          <tbody id="khSheetBody"></tbody>
+        </table>
+        <button class="btn btn-secondary" id="khExportBtn">Export CSV</button>
+      </div>
+    </section>
+
+    <section class="view" id="view-notices">
+      <div class="card">
+        <p class="eyebrow">Send</p>
+        <h2>Compose notice</h2>
+        <label for="noticeMsg">Message</label>
+        <textarea id="noticeMsg" placeholder="Type your notice here…"></textarea>
+        <label for="noticeImage">Image (optional)</label>
+        <input type="file" id="noticeImage" accept="image/*">
+        <label for="noticeAudience">Send to</label>
+        <select id="noticeAudience">
+          <option value="all">Everyone</option>
+          <option value="personal">Selected employees</option>
+        </select>
+        <div id="noticeTargetWrap" style="display:none;">
+          <label for="noticeSearchEmp">Search employee</label>
+          <input type="text" id="noticeSearchEmp" placeholder="Search by name or mobile">
+          <div class="check-list" id="noticeCheckList"></div>
+        </div>
+        <button class="btn btn-primary" id="noticeSendBtn">Send Notice</button>
+        <div id="noticeResult" class="result-banner"></div>
+      </div>
+      <div class="card">
+        <p class="eyebrow">History</p>
+        <h2>Sent notices</h2>
+        <div id="sentNoticesList"><div class="empty">No notices sent yet.</div></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="card">
+        <p class="eyebrow">Configuration</p>
+        <h2>Settings</h2>
+        <div class="settings-block">
+          <label for="officeStartTime">Office start time (for late tracking)</label>
+          <input type="time" id="officeStartTime">
+          <button class="btn btn-secondary" id="saveTimeBtn">Save Time</button>
+          <div id="timeResult" class="result-banner"></div>
+        </div>
+        <div class="settings-block">
+          <label for="newBranchName">Add branch / location</label>
+          <input type="text" id="newBranchName" placeholder="e.g. Surat Branch">
+          <button class="btn btn-secondary" id="addBranchBtn">Add Branch</button>
+          <div id="branchList" style="margin-top:10px;"></div>
+        </div>
+        <div class="settings-block">
+          <label>Add admin login</label>
+          <input type="text" id="newUsername" placeholder="Username">
+          <input type="password" id="newUserPass" placeholder="Password" style="margin-top:8px;">
+          <button class="btn btn-secondary" id="addUserBtn">Create Admin Login</button>
+          <div id="userResult" class="result-banner"></div>
+          <div id="userList" style="margin-top:10px;"></div>
+        </div>
+        <div class="settings-block">
+          <label>Data backup</label>
+          <p class="hint" style="margin-top:0;">Download a full backup of employees, attendance, expenses and notices.</p>
+          <button class="btn btn-secondary" id="backupBtn">Export All Data (JSON)</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const SUPABASE_URL = "https://tthnkrmgxlnghdmiyfid.supabase.co";
+const SUPABASE_KEY = "sb_publishable_nwvCpQYsTcuoocd7_aFxxw_1yfDxUw1";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function dbGetAll(table){ const {data,error}=await sb.from(table).select('*'); if(error) throw error; return data||[]; }
+async function dbInsert(table,row){ const {error}=await sb.from(table).insert(row); if(error) throw error; }
+async function dbUpsert(table,row,c){ const {error}=await sb.from(table).upsert(row,{onConflict:c}); if(error) throw error; }
+async function dbDelete(table,col,val){ const {error}=await sb.from(table).delete().eq(col,val); if(error) throw error; }
+
+let employees=[], attendanceMap={}, expenses=[], branches=[], adminUsers=[], employeeRequests=[], notices=[];
+let officeStartTime='09:30';
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString('en-IN',{hour12:true, hour:'2-digit', minute:'2-digit'}); }
+function currentMonthStr(){ return new Date().toISOString().slice(0,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function csvEsc(s){ return `"${String(s).replace(/"/g,'""')}"`; }
+function downloadCsv(csv, filename){
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+}
+function weekRange(){
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMon = (day===0? -6 : 1-day);
+  const mon = new Date(now); mon.setDate(now.getDate()+diffToMon);
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  return [mon.toISOString().slice(0,10), sun.toISOString().slice(0,10)];
+}
+async function startCamera(videoEl){
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}, audio:false});
+  videoEl.srcObject = stream;
+  return new Promise(res=> videoEl.onloadedmetadata = ()=>{ videoEl.play(); res(); });
+}
+
+document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+async function doLogin(){
+  const username=document.getElementById('loginUser').value.trim();
+  const password=document.getElementById('loginPass').value;
+  const errEl=document.getElementById('loginError');
+  errEl.style.display='none';
+  if(!username||!password){ errEl.textContent='Username aur password dono bharo'; errEl.style.display='block'; return; }
+  try{
+    const {data,error} = await sb.from('app_users').select('*').eq('username',username).eq('password',password).maybeSingle();
+    if(error) throw error;
+    if(!data){ errEl.textContent='Galat username ya password'; errEl.style.display='block'; return; }
+    document.getElementById('loginScreen').style.display='none';
+    document.getElementById('veil').style.display='flex';
+    await loadAndShowAdmin();
+  }catch(e){ errEl.textContent='Login failed: '+e.message; errEl.style.display='block'; }
+}
+document.getElementById('adminLogoutBtn').addEventListener('click', ()=>{ location.reload(); });
+
+document.getElementById('navBar').querySelectorAll('button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#navBar button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('#adminPanel .view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='dashboard') renderDashboard();
+    if(btn.dataset.view==='requests') renderRequestsList();
+    if(btn.dataset.view==='employees') renderEmpList();
+    if(btn.dataset.view==='attendance') renderAttSheet();
+    if(btn.dataset.view==='kharcha') renderKhSheet();
+    if(btn.dataset.view==='notices') { populateNoticeCheckList(); renderSentNotices(); }
+    if(btn.dataset.view==='settings') renderSettingsView();
+  });
+});
+
+function renderDashboard(){
+  const today = todayStr();
+  const month = currentMonthStr();
+  let present=0, late=0;
+  employees.forEach(emp=>{
+    const rec = attendanceMap[`${emp.id}_${today}`];
+    if(rec && rec.punches.length){
+      present++;
+      if(rec.punches.some(p=>p.type==='IN' && p.late)) late++;
+    }
+  });
+  const absent = employees.length - present;
+  const kharcha = expenses.filter(x=>x.date.slice(0,7)===month).reduce((s,x)=>s+(Number(x.amount)||0),0);
+  document.getElementById('statPresent').textContent = present;
+  document.getElementById('statAbsent').textContent = absent;
+  document.getElementById('statLate').textContent = late;
+  document.getElementById('statKharcha').textContent = '₹'+kharcha.toFixed(0);
+
+  const pending = employeeRequests.filter(r=>r.status==='pending');
+  document.getElementById('pendingCountHeading').textContent = `Pending approvals (${pending.length})`;
+  const dashList = document.getElementById('dashPendingList');
+  dashList.innerHTML = pending.length ? pending.slice(0,5).map(r=>`
+    <div class="emp-row"><img src="${r.photo}"><div class="meta"><div class="name">${escapeHtml(r.name)}</div><div class="sub">${escapeHtml(r.mobile||'')}</div></div><span class="tag pending">PENDING</span></div>
+  `).join('') : '<div class="empty">No pending requests.</div>';
+}
+
+function renderRequestsList(){
+  const wrap = document.getElementById('requestsList');
+  const pending = employeeRequests.filter(r=>r.status==='pending');
+  if(!pending.length){ wrap.innerHTML='<div class="empty">No pending requests.</div>'; return; }
+  wrap.innerHTML = pending.map(r=>`
+    <div class="emp-row">
+      <img src="${r.photo}">
+      <div class="meta"><div class="name">${escapeHtml(r.name)}</div><div class="sub">${escapeHtml(r.mobile||'')}</div></div>
+    </div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-accept" data-accept="${r.id}">Accept</button>
+      <button class="btn btn-reject" data-reject="${r.id}">Reject</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-accept]').forEach(b=>b.addEventListener('click', ()=>acceptRequest(b.dataset.accept)));
+  wrap.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click', ()=>rejectRequest(b.dataset.reject)));
+}
+
+async function acceptRequest(id){
+  const req = employeeRequests.find(r=>r.id===id);
+  if(!req) return;
+  const emp = {id:'emp_'+Date.now(), name:req.name, mobile:req.mobile, photo:req.photo, descriptor:req.descriptor, branch_id:null, designation:''};
+  await dbInsert('employees', emp);
+  employees.push(emp);
+  await dbDelete('employee_requests','id',id);
+  employeeRequests = employeeRequests.filter(r=>r.id!==id);
+  renderRequestsList(); renderDashboard(); renderEmpList();
+}
+async function rejectRequest(id){
+  if(!confirm('Reject this request?')) return;
+  await dbDelete('employee_requests','id',id);
+  employeeRequests = employeeRequests.filter(r=>r.id!==id);
+  renderRequestsList(); renderDashboard();
+}
+
+function branchName(branchId){ if(!branchId) return ''; const b=branches.find(x=>x.id===branchId); return b?b.name:''; }
+function populateBranchSelect(sel){ sel.innerHTML = branches.map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join(''); }
+
+function renderEmpList(){
+  const wrap = document.getElementById('empList');
+  if(!employees.length){ wrap.innerHTML='<div class="empty">No employees yet.</div>'; return; }
+  wrap.innerHTML = employees.map(e=>`
+    <div class="emp-row">
+      <img src="${e.photo}">
+      <div class="meta"><div class="name">${escapeHtml(e.name)}</div>
+      <div class="sub">${escapeHtml(e.mobile||'')}${e.designation?' · '+escapeHtml(e.designation):''}${branchName(e.branch_id)?' · '+escapeHtml(branchName(e.branch_id)):''}</div></div>
+      <button class="del-x" data-id="${e.id}">✕</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('.del-x').forEach(b=>b.addEventListener('click', async ()=>{
+    if(!confirm('Remove this employee?')) return;
+    await dbDelete('employees','id',b.dataset.id);
+    employees = employees.filter(e=>e.id!==b.dataset.id);
+    renderEmpList();
+  }));
+}
+
+let regDescriptor=null, regPhotoData=null;
+async function initAdminRegisterCam(){
+  const video=document.getElementById('regVideo'); const status=document.getElementById('regStatus');
+  try{ await startCamera(video); status.textContent="Position face in frame, then capture"; document.getElementById('regCaptureBtn').disabled=false; }
+  catch(e){ status.textContent="Camera unavailable — check permissions"; }
+}
+document.getElementById('regCaptureBtn').addEventListener('click', async ()=>{
+  alert('Face capture uses a lightweight detector only in the User Panel app to keep this Admin Panel fast. Please add new employees via the Requests tab, or use the User Panel to register them.');
+});
+document.getElementById('regSaveBtn').addEventListener('click', async ()=>{
+  const name=document.getElementById('regName').value.trim();
+  const mobile=document.getElementById('regMobile').value.trim();
+  const designation=document.getElementById('regDesignation').value.trim();
+  const branchId=document.getElementById('regBranch').value||null;
+  const result=document.getElementById('regResult');
+  if(!name){ result.className='result-banner err'; result.textContent='Naam bharo'; return; }
+  result.className='result-banner err';
+  result.textContent='Photo/face capture ke liye User Panel se "Register here" use karo, phir yahan Requests tab se Accept karo.';
+});
+
+function flattenAttendance(){
+  const rows=[];
+  Object.values(attendanceMap).forEach(rec=>{
+    const emp = employees.find(e=>e.id===rec.empId);
+    if(!emp) return;
+    const ins = rec.punches.filter(p=>p.type==='IN');
+    const outs = rec.punches.filter(p=>p.type==='OUT');
+    const ip = rec.punches.length ? rec.punches[rec.punches.length-1].ip : '';
+    rows.push({
+      name: emp.name, mobile: emp.mobile||'', date: rec.date,
+      inTimes: ins.map(p=>fmtTime(p.time)+(p.late?' (LATE)':'')).join(', '),
+      outTimes: outs.map(p=>fmtTime(p.time)).join(', '),
+      ip
+    });
+  });
+  return rows;
+}
+let attTab='daily';
+['attTabDaily','attTabWeekly','attTabMonthly'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', ()=>{
+    ['attTabDaily','attTabWeekly','attTabMonthly'].forEach(x=>document.getElementById(x).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    attTab = id==='attTabDaily'?'daily':id==='attTabWeekly'?'weekly':'monthly';
+    renderAttSheet();
+  });
+});
+document.getElementById('attSearchDate').addEventListener('input', renderAttSheet);
+document.getElementById('attSearchText').addEventListener('input', renderAttSheet);
+
+function renderAttSheet(){
+  let rows = flattenAttendance();
+  const searchDate = document.getElementById('attSearchDate').value;
+  const searchText = document.getElementById('attSearchText').value.trim().toLowerCase();
+  if(searchDate || searchText){
+    rows = rows.filter(r=>{
+      const matchDate = searchDate ? r.date===searchDate : true;
+      const matchText = searchText ? (r.name.toLowerCase().includes(searchText) || r.mobile.toLowerCase().includes(searchText)) : true;
+      return matchDate && matchText;
+    });
+  } else {
+    if(attTab==='daily'){ const t=todayStr(); rows = rows.filter(r=>r.date===t); }
+    else if(attTab==='weekly'){ const [mon,sun]=weekRange(); rows = rows.filter(r=>r.date>=mon && r.date<=sun); }
+    else { const m=currentMonthStr(); rows = rows.filter(r=>r.date.slice(0,7)===m); }
+  }
+  rows.sort((a,b)=> a.date<b.date?1:-1);
+  const body = document.getElementById('attSheetBody');
+  body.innerHTML = rows.length ? rows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${r.inTimes||'—'}</td><td>${r.outTimes||'—'}</td><td class="util" style="font-size:10px;">${r.ip||'—'}</td></tr>
+  `).join('') : `<tr><td colspan="5" class="empty">No records found.</td></tr>`;
+}
+document.getElementById('attExportBtn').addEventListener('click', ()=>{
+  const rows = flattenAttendance();
+  let csv='Name,Mobile,Date,In,Out,IP\n';
+  rows.forEach(r=> csv += `${csvEsc(r.name)},${csvEsc(r.mobile)},${r.date},${csvEsc(r.inTimes)},${csvEsc(r.outTimes)},${csvEsc(r.ip)}\n`);
+  downloadCsv(csv, `attendance_sheet_${todayStr()}.csv`);
+});
+
+let khTab='daily';
+['khTabDaily','khTabWeekly','khTabMonthly'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', ()=>{
+    ['khTabDaily','khTabWeekly','khTabMonthly'].forEach(x=>document.getElementById(x).classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    khTab = id==='khTabDaily'?'daily':id==='khTabWeekly'?'weekly':'monthly';
+    renderKhSheet();
+  });
+});
+document.getElementById('khSearchDate').addEventListener('input', renderKhSheet);
+document.getElementById('khSearchText').addEventListener('input', renderKhSheet);
+
+function empByIdName(id){ const e=employees.find(x=>x.id===id); return e?e.name:'Office'; }
+function empByIdMobile(id){ const e=employees.find(x=>x.id===id); return e?(e.mobile||''):''; }
+
+function renderKhSheet(){
+  let rows = expenses.map(x=>({...x, name: empByIdName(x.empId), mobile: empByIdMobile(x.empId)}));
+  const searchDate = document.getElementById('khSearchDate').value;
+  const searchText = document.getElementById('khSearchText').value.trim().toLowerCase();
+  if(searchDate || searchText){
+    rows = rows.filter(r=>{
+      const matchDate = searchDate ? r.date===searchDate : true;
+      const matchText = searchText ? (r.name.toLowerCase().includes(searchText) || r.mobile.toLowerCase().includes(searchText)) : true;
+      return matchDate && matchText;
+    });
+  } else {
+    if(khTab==='daily'){ const t=todayStr(); rows = rows.filter(r=>r.date===t); }
+    else if(khTab==='weekly'){ const [mon,sun]=weekRange(); rows = rows.filter(r=>r.date>=mon && r.date<=sun); }
+    else { const m=currentMonthStr(); rows = rows.filter(r=>r.date.slice(0,7)===m); }
+  }
+  rows.sort((a,b)=> a.date<b.date?1:-1);
+  const total = rows.reduce((s,x)=>s+(Number(x.amount)||0),0);
+  document.getElementById('khTotal').textContent = `Total: ₹${total.toFixed(2)} • ${rows.length} entries`;
+  const body = document.getElementById('khSheetBody');
+  body.innerHTML = rows.length ? rows.map(r=>`
+    <tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${escapeHtml(r.item)}</td><td>${escapeHtml(r.qty||'—')}</td><td>₹${Number(r.amount).toFixed(2)}</td></tr>
+  `).join('') : `<tr><td colspan="5" class="empty">No records found.</td></tr>`;
+}
+document.getElementById('khExportBtn').addEventListener('click', ()=>{
+  const rows = expenses.map(x=>({...x, name: empByIdName(x.empId), mobile: empByIdMobile(x.empId)}));
+  let csv='Name,Mobile,Date,Item,Quantity,Amount\n';
+  rows.forEach(r=> csv += `${csvEsc(r.name)},${csvEsc(r.mobile)},${r.date},${csvEsc(r.item)},${csvEsc(r.qty||'')},${r.amount}\n`);
+  downloadCsv(csv, `kharcha_sheet_${todayStr()}.csv`);
+});
+
+document.getElementById('noticeAudience').addEventListener('change', ()=>{
+  document.getElementById('noticeTargetWrap').style.display = document.getElementById('noticeAudience').value==='personal' ? 'block':'none';
+});
+document.getElementById('noticeSearchEmp').addEventListener('input', populateNoticeCheckList);
+
+function populateNoticeCheckList(){
+  const wrap = document.getElementById('noticeCheckList');
+  const q = (document.getElementById('noticeSearchEmp').value||'').trim().toLowerCase();
+  const list = employees.filter(e=> !q || e.name.toLowerCase().includes(q) || (e.mobile||'').toLowerCase().includes(q));
+  wrap.innerHTML = list.length ? list.map(e=>`
+    <label class="check-item"><input type="checkbox" value="${e.id}" class="notice-emp-check"> ${escapeHtml(e.name)} <span class="util" style="color:var(--muted);font-size:10px;">${escapeHtml(e.mobile||'')}</span></label>
+  `).join('') : '<div class="empty">No employees found.</div>';
+}
+
+let noticeImageBase64 = null;
+document.getElementById('noticeImage').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file){ noticeImageBase64=null; return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{ noticeImageBase64 = reader.result; };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('noticeSendBtn').addEventListener('click', async ()=>{
+  const message = document.getElementById('noticeMsg').value.trim();
+  const audience = document.getElementById('noticeAudience').value;
+  const result = document.getElementById('noticeResult');
+  if(!message){ result.className='result-banner err'; result.textContent='Message likho pehle'; return; }
+  let targetIds = null;
+  if(audience==='personal'){
+    targetIds = [...document.querySelectorAll('.notice-emp-check:checked')].map(c=>c.value);
+    if(!targetIds.length){ result.className='result-banner err'; result.textContent='Kam se kam ek employee select karo'; return; }
+  }
+  const notice = {id:'not_'+Date.now(), message, image: noticeImageBase64, audience, target_emp_ids: targetIds};
+  await dbInsert('notices', notice);
+  notices.push({...notice, created_at: new Date().toISOString()});
+  result.className='result-banner in'; result.textContent='Notice sent!';
+  document.getElementById('noticeMsg').value='';
+  document.getElementById('noticeImage').value='';
+  noticeImageBase64 = null;
+  renderSentNotices();
+});
+
+function renderSentNotices(){
+  const wrap = document.getElementById('sentNoticesList');
+  const sorted = [...notices].sort((a,b)=> new Date(b.created_at)-new Date(a.created_at));
+  wrap.innerHTML = sorted.length ? sorted.map(n=>{
+    const targetNames = n.audience==='personal' ? (n.target_emp_ids||[]).map(empByIdName).join(', ') : 'Everyone';
+    return `<div class="notice-card">
+      <span class="notice-tag">${n.audience==='all'?'ALL':'PERSONAL'}</span>
+      <div class="msg">${escapeHtml(n.message)}</div>
+      ${n.image?`<img src="${n.image}">`:''}
+      <div class="meta">${new Date(n.created_at).toLocaleString('en-IN')} · To: ${escapeHtml(targetNames)}</div>
+    </div>`;
+  }).join('') : '<div class="empty">No notices sent yet.</div>';
+}
+
+document.getElementById('saveTimeBtn').addEventListener('click', async ()=>{
+  const t=document.getElementById('officeStartTime').value;
+  const result=document.getElementById('timeResult');
+  if(!t){ result.className='result-banner err'; result.textContent='Time select karo'; return; }
+  await dbUpsert('settings', {id:'main', office_start_time:t}, 'id');
+  officeStartTime = t;
+  result.className='result-banner in'; result.textContent='Saved.';
+});
+document.getElementById('addBranchBtn').addEventListener('click', async ()=>{
+  const name=document.getElementById('newBranchName').value.trim();
+  if(!name) return;
+  const branch={id:'br_'+Date.now(), name};
+  await dbInsert('branches', branch);
+  branches.push(branch);
+  document.getElementById('newBranchName').value='';
+  populateBranchSelect(document.getElementById('regBranch'));
+  renderBranchList();
+});
+function renderBranchList(){
+  document.getElementById('branchList').innerHTML = branches.map(b=>`<div class="emp-row"><div class="meta"><div class="name">${escapeHtml(b.name)}</div></div></div>`).join('');
+}
+document.getElementById('addUserBtn').addEventListener('click', async ()=>{
+  const username=document.getElementById('newUsername').value.trim();
+  const password=document.getElementById('newUserPass').value;
+  const result=document.getElementById('userResult');
+  if(!username||!password){ result.className='result-banner err'; result.textContent='Username aur password bharo'; return; }
+  try{
+    const user={id:'usr_'+Date.now(), username, password, role:'admin'};
+    await dbInsert('app_users', user);
+    adminUsers.push(user);
+    result.className='result-banner in'; result.textContent=`Admin login created for ${username}`;
+    document.getElementById('newUsername').value=''; document.getElementById('newUserPass').value='';
+    renderUserList();
+  }catch(e){ result.className='result-banner err'; result.textContent='Failed: '+e.message; }
+});
+function renderUserList(){
+  document.getElementById('userList').innerHTML = adminUsers.map(u=>`<div class="emp-row"><div class="meta"><div class="name">${escapeHtml(u.username)}</div></div></div>`).join('');
+}
+document.getElementById('backupBtn').addEventListener('click', ()=>{
+  const backup = {exported_at:new Date().toISOString(), employees, attendance:Object.values(attendanceMap), expenses, branches, notices};
+  const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`cpc_employees_backup_${todayStr()}.json`; a.click();
+});
+function renderSettingsView(){
+  document.getElementById('officeStartTime').value = officeStartTime;
+  renderBranchList();
+  renderUserList();
+}
+
+async function loadAndShowAdmin(){
+  try{
+    employees = await dbGetAll('employees');
+    const attRows = await dbGetAll('attendance');
+    attRows.forEach(r=> attendanceMap[r.key] = {key:r.key, empId:r.emp_id, date:r.date, punches:r.punches||[]});
+    const expRows = await dbGetAll('expenses');
+    expenses = expRows.map(x=>({id:x.id, date:x.date, time:x.time, type:x.type, item:x.item, qty:x.qty, amount:Number(x.amount), empId:x.emp_id}));
+    branches = await dbGetAll('branches');
+    adminUsers = await dbGetAll('app_users');
+    employeeRequests = (await dbGetAll('employee_requests')).filter(r=>r.status==='pending');
+    notices = await dbGetAll('notices');
+    const settingsRows = await dbGetAll('settings');
+    if(settingsRows.length) officeStartTime = settingsRows[0].office_start_time || '09:30';
+
+    document.getElementById('veil').style.display='none';
+    document.getElementById('adminPanel').style.display='block';
+    populateBranchSelect(document.getElementById('regBranch'));
+    renderDashboard();
+  }catch(err){
+    document.getElementById('veil').innerHTML = `<div style="padding:0 30px;text-align:center;font-family:'Courier New',monospace;font-size:13px;color:#A8432F;">Failed to load: ${err.message}<br><br>Check your internet connection and reload.</div>`;
+  }
+}
+</script>
+</body>
+</html>
