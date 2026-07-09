@@ -159,6 +159,7 @@
     <button data-view="attendance">Attendance</button>
     <button data-view="kharcha">Kharcha</button>
     <button data-view="notices">Notices</button>
+    <button data-view="trash">Trash</button>
     <button data-view="settings">Settings</button>
   </nav>
 
@@ -236,10 +237,14 @@
           <input type="text" id="attSearchText" placeholder="Name or mobile">
         </div>
         <table>
-          <thead><tr><th>Name</th><th>Mobile</th><th>In</th><th>Out</th><th>IP</th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="attSelectAll"></th><th>Name</th><th>Mobile</th><th>In</th><th>Out</th><th>IP</th></tr></thead>
           <tbody id="attSheetBody"></tbody>
         </table>
-        <button class="btn btn-secondary" id="attExportBtn">Export CSV</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="attExportBtn">Export CSV</button>
+          <button class="btn btn-reject" id="attDeleteSelectedBtn">Delete Selected</button>
+        </div>
+        <button class="btn btn-reject" id="attDeleteAllBtn">Delete All (this view)</button>
       </div>
     </section>
 
@@ -258,10 +263,14 @@
         </div>
         <div class="util" id="khTotal" style="font-size:12px;margin-bottom:10px;"></div>
         <table>
-          <thead><tr><th>Name</th><th>Mobile</th><th>Item</th><th>Qty</th><th>₹</th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="khSelectAll"></th><th>Name</th><th>Mobile</th><th>Item</th><th>Qty</th><th>₹</th></tr></thead>
           <tbody id="khSheetBody"></tbody>
         </table>
-        <button class="btn btn-secondary" id="khExportBtn">Export CSV</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="khExportBtn">Export CSV</button>
+          <button class="btn btn-reject" id="khDeleteSelectedBtn">Delete Selected</button>
+        </div>
+        <button class="btn btn-reject" id="khDeleteAllBtn">Delete All (this view)</button>
       </div>
     </section>
 
@@ -293,10 +302,34 @@
       </div>
     </section>
 
+    <!-- TRASH -->
+    <section class="view" id="view-trash">
+      <div class="card">
+        <p class="eyebrow">Awaiting Review</p>
+        <h2>Deleted by employees</h2>
+        <p class="hint">Ye entries employees ne apne panel se hataye hain. Restore karo ya permanently delete confirm karo.</p>
+        <div id="trashPendingList"><div class="empty">Kuch bhi pending nahi hai.</div></div>
+      </div>
+      <div class="card">
+        <p class="eyebrow">30-Day Window</p>
+        <h2>Scheduled for permanent delete</h2>
+        <p class="hint">In entries ko in dino tak restore kiya ja sakta hai, uske baad hamesha ke liye chali jayengi.</p>
+        <div id="trashScheduledList"><div class="empty">Kuch bhi scheduled nahi hai.</div></div>
+      </div>
+    </section>
+
     <section class="view" id="view-settings">
       <div class="card">
         <p class="eyebrow">Configuration</p>
         <h2>Settings</h2>
+        <div class="settings-block">
+          <label>Change my password</label>
+          <div class="util" id="currentAdminLabel" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>
+          <input type="password" id="changePassNew" placeholder="New password">
+          <input type="password" id="changePassConfirm" placeholder="Confirm new password" style="margin-top:8px;">
+          <button class="btn btn-secondary" id="changePassBtn">Update Password</button>
+          <div id="changePassResult" class="result-banner"></div>
+        </div>
         <div class="settings-block">
           <label for="officeStartTime">Office start time (for late tracking)</label>
           <input type="time" id="officeStartTime">
@@ -327,8 +360,10 @@
   </main>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+const MODEL_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights";
 const SUPABASE_URL = "https://tthnkrmgxlnghdmiyfid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_nwvCpQYsTcuoocd7_aFxxw_1yfDxUw1";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -337,8 +372,11 @@ async function dbGetAll(table){ const {data,error}=await sb.from(table).select('
 async function dbInsert(table,row){ const {error}=await sb.from(table).insert(row); if(error) throw error; }
 async function dbUpsert(table,row,c){ const {error}=await sb.from(table).upsert(row,{onConflict:c}); if(error) throw error; }
 async function dbDelete(table,col,val){ const {error}=await sb.from(table).delete().eq(col,val); if(error) throw error; }
+async function dbUpdate(table,col,val,patch){ const {error}=await sb.from(table).update(patch).eq(col,val); if(error) throw error; }
 
 let employees=[], attendanceMap={}, expenses=[], branches=[], adminUsers=[], employeeRequests=[], notices=[];
+let trashAttendance=[], trashExpenses=[];
+let currentAdminUsername=null;
 let officeStartTime='09:30';
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -377,6 +415,7 @@ async function doLogin(){
     const {data,error} = await sb.from('app_users').select('*').eq('username',username).eq('password',password).maybeSingle();
     if(error) throw error;
     if(!data){ errEl.textContent='Galat username ya password'; errEl.style.display='block'; return; }
+    currentAdminUsername = data.username;
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('veil').style.display='flex';
     await loadAndShowAdmin();
@@ -396,6 +435,7 @@ document.getElementById('navBar').querySelectorAll('button').forEach(btn=>{
     if(btn.dataset.view==='attendance') renderAttSheet();
     if(btn.dataset.view==='kharcha') renderKhSheet();
     if(btn.dataset.view==='notices') { populateNoticeCheckList(); renderSentNotices(); }
+    if(btn.dataset.view==='trash') renderTrashView();
     if(btn.dataset.view==='settings') renderSettingsView();
   });
 });
@@ -490,17 +530,37 @@ async function initAdminRegisterCam(){
   catch(e){ status.textContent="Camera unavailable — check permissions"; }
 }
 document.getElementById('regCaptureBtn').addEventListener('click', async ()=>{
-  alert('Face capture uses a lightweight detector only in the User Panel app to keep this Admin Panel fast. Please add new employees via the Requests tab, or use the User Panel to register them.');
+  const video=document.getElementById('regVideo'); const status=document.getElementById('regStatus');
+  status.textContent="Reading face…";
+  const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+  if(!detection){ status.textContent="No face detected — try again"; return; }
+  regDescriptor = Array.from(detection.descriptor);
+  const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  regPhotoData = canvas.toDataURL('image/jpeg',0.85);
+  document.getElementById('regThumb').src=regPhotoData;
+  document.getElementById('regThumbRow').style.display='flex';
+  status.textContent="Captured.";
+  checkRegReady();
 });
+function checkRegReady(){ document.getElementById('regSaveBtn').disabled = !(document.getElementById('regName').value.trim() && regDescriptor); }
+document.getElementById('regName').addEventListener('input', checkRegReady);
 document.getElementById('regSaveBtn').addEventListener('click', async ()=>{
   const name=document.getElementById('regName').value.trim();
   const mobile=document.getElementById('regMobile').value.trim();
   const designation=document.getElementById('regDesignation').value.trim();
   const branchId=document.getElementById('regBranch').value||null;
   const result=document.getElementById('regResult');
-  if(!name){ result.className='result-banner err'; result.textContent='Naam bharo'; return; }
-  result.className='result-banner err';
-  result.textContent='Photo/face capture ke liye User Panel se "Register here" use karo, phir yahan Requests tab se Accept karo.';
+  if(!name||!regDescriptor){ result.className='result-banner err'; result.textContent='Naam aur photo dono zaroori hain'; return; }
+  const emp={id:'emp_'+Date.now(), name, mobile, designation, branch_id:branchId, photo:regPhotoData, descriptor:regDescriptor};
+  await dbInsert('employees', emp);
+  employees.push(emp);
+  result.className='result-banner in'; result.textContent=`Saved: ${name}`;
+  document.getElementById('regName').value=''; document.getElementById('regMobile').value=''; document.getElementById('regDesignation').value='';
+  regDescriptor=null; regPhotoData=null;
+  document.getElementById('regThumbRow').style.display='none';
+  document.getElementById('regSaveBtn').disabled=true;
+  renderEmpList();
 });
 
 function flattenAttendance(){
@@ -512,7 +572,7 @@ function flattenAttendance(){
     const outs = rec.punches.filter(p=>p.type==='OUT');
     const ip = rec.punches.length ? rec.punches[rec.punches.length-1].ip : '';
     rows.push({
-      name: emp.name, mobile: emp.mobile||'', date: rec.date,
+      key: rec.key, name: emp.name, mobile: emp.mobile||'', date: rec.date,
       inTimes: ins.map(p=>fmtTime(p.time)+(p.late?' (LATE)':'')).join(', '),
       outTimes: outs.map(p=>fmtTime(p.time)).join(', '),
       ip
@@ -548,11 +608,28 @@ function renderAttSheet(){
     else { const m=currentMonthStr(); rows = rows.filter(r=>r.date.slice(0,7)===m); }
   }
   rows.sort((a,b)=> a.date<b.date?1:-1);
+  window._attSheetRows = rows;
   const body = document.getElementById('attSheetBody');
   body.innerHTML = rows.length ? rows.map(r=>`
-    <tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${r.inTimes||'—'}</td><td>${r.outTimes||'—'}</td><td class="util" style="font-size:10px;">${r.ip||'—'}</td></tr>
-  `).join('') : `<tr><td colspan="5" class="empty">No records found.</td></tr>`;
+    <tr><td><input type="checkbox" class="att-row-check" value="${r.key}"></td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${r.inTimes||'—'}</td><td>${r.outTimes||'—'}</td><td class="util" style="font-size:10px;">${r.ip||'—'}</td></tr>
+  `).join('') : `<tr><td colspan="6" class="empty">No records found.</td></tr>`;
+  document.getElementById('attSelectAll').checked = false;
 }
+document.getElementById('attSelectAll').addEventListener('change', (e)=>{
+  document.querySelectorAll('.att-row-check').forEach(c=> c.checked = e.target.checked);
+});
+document.getElementById('attDeleteSelectedBtn').addEventListener('click', async ()=>{
+  const keys = [...document.querySelectorAll('.att-row-check:checked')].map(c=>c.value);
+  if(!keys.length){ alert('Pehle kuch select karo'); return; }
+  if(!confirm(`${keys.length} record(s) delete karein? Ye 30 din tak Trash mein restore ho sakte hain.`)) return;
+  await adminDeleteAttendance(keys);
+});
+document.getElementById('attDeleteAllBtn').addEventListener('click', async ()=>{
+  const rows = window._attSheetRows || [];
+  if(!rows.length){ alert('Is view mein koi record nahi hai'); return; }
+  if(!confirm(`Is view ke saare ${rows.length} record delete karein? Ye 30 din tak Trash mein restore ho sakte hain.`)) return;
+  await adminDeleteAttendance(rows.map(r=>r.key));
+});
 document.getElementById('attExportBtn').addEventListener('click', ()=>{
   const rows = flattenAttendance();
   let csv='Name,Mobile,Date,In,Out,IP\n';
@@ -591,13 +668,30 @@ function renderKhSheet(){
     else { const m=currentMonthStr(); rows = rows.filter(r=>r.date.slice(0,7)===m); }
   }
   rows.sort((a,b)=> a.date<b.date?1:-1);
+  window._khSheetRows = rows;
   const total = rows.reduce((s,x)=>s+(Number(x.amount)||0),0);
   document.getElementById('khTotal').textContent = `Total: ₹${total.toFixed(2)} • ${rows.length} entries`;
   const body = document.getElementById('khSheetBody');
   body.innerHTML = rows.length ? rows.map(r=>`
-    <tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${escapeHtml(r.item)}</td><td>${escapeHtml(r.qty||'—')}</td><td>₹${Number(r.amount).toFixed(2)}</td></tr>
-  `).join('') : `<tr><td colspan="5" class="empty">No records found.</td></tr>`;
+    <tr><td><input type="checkbox" class="kh-row-check" value="${r.id}"></td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.mobile)}</td><td>${escapeHtml(r.item)}</td><td>${escapeHtml(r.qty||'—')}</td><td>₹${Number(r.amount).toFixed(2)}</td></tr>
+  `).join('') : `<tr><td colspan="6" class="empty">No records found.</td></tr>`;
+  document.getElementById('khSelectAll').checked = false;
 }
+document.getElementById('khSelectAll').addEventListener('change', (e)=>{
+  document.querySelectorAll('.kh-row-check').forEach(c=> c.checked = e.target.checked);
+});
+document.getElementById('khDeleteSelectedBtn').addEventListener('click', async ()=>{
+  const ids = [...document.querySelectorAll('.kh-row-check:checked')].map(c=>c.value);
+  if(!ids.length){ alert('Pehle kuch select karo'); return; }
+  if(!confirm(`${ids.length} entry(s) delete karein? Ye 30 din tak Trash mein restore ho sakte hain.`)) return;
+  await adminDeleteExpenses(ids);
+});
+document.getElementById('khDeleteAllBtn').addEventListener('click', async ()=>{
+  const rows = window._khSheetRows || [];
+  if(!rows.length){ alert('Is view mein koi entry nahi hai'); return; }
+  if(!confirm(`Is view ki saari ${rows.length} entries delete karein? Ye 30 din tak Trash mein restore ho sakti hain.`)) return;
+  await adminDeleteExpenses(rows.map(r=>r.id));
+});
 document.getElementById('khExportBtn').addEventListener('click', ()=>{
   const rows = expenses.map(x=>({...x, name: empByIdName(x.empId), mobile: empByIdMobile(x.empId)}));
   let csv='Name,Mobile,Date,Item,Quantity,Amount\n';
@@ -705,19 +799,143 @@ document.getElementById('backupBtn').addEventListener('click', ()=>{
   const blob = new Blob([JSON.stringify(backup,null,2)], {type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`cpc_employees_backup_${todayStr()}.json`; a.click();
 });
+/* ---------- Trash / Recycle Bin ---------- */
+function daysLeft(purgeAt){
+  const ms = new Date(purgeAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / (1000*60*60*24)));
+}
+
+function renderTrashView(){
+  const pendingWrap = document.getElementById('trashPendingList');
+  const scheduledWrap = document.getElementById('trashScheduledList');
+
+  const pendingAtt = trashAttendance.filter(r=>!r.purgeAt);
+  const pendingExp = trashExpenses.filter(x=>!x.purgeAt);
+  const pendingItems = [
+    ...pendingAtt.map(r=>({kind:'attendance', id:r.key, label:`Attendance — ${empByIdName(r.empId)} — ${r.date}`})),
+    ...pendingExp.map(x=>({kind:'expense', id:x.id, label:`Kharcha — ${empByIdName(x.empId)} — ${escapeHtml(x.item)} ₹${x.amount}`}))
+  ];
+  pendingWrap.innerHTML = pendingItems.length ? pendingItems.map(it=>`
+    <div class="emp-row"><div class="meta"><div class="name">${it.label}</div></div></div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-accept" data-restore="${it.kind}:${it.id}">Restore</button>
+      <button class="btn btn-reject" data-purge="${it.kind}:${it.id}">Delete Permanently</button>
+    </div>
+  `).join('') : '<div class="empty">Kuch bhi pending nahi hai.</div>';
+
+  const scheduledAtt = trashAttendance.filter(r=>r.purgeAt);
+  const scheduledExp = trashExpenses.filter(x=>x.purgeAt);
+  const scheduledItems = [
+    ...scheduledAtt.map(r=>({kind:'attendance', id:r.key, label:`Attendance — ${empByIdName(r.empId)} — ${r.date}`, purgeAt:r.purgeAt})),
+    ...scheduledExp.map(x=>({kind:'expense', id:x.id, label:`Kharcha — ${empByIdName(x.empId)} — ${escapeHtml(x.item)} ₹${x.amount}`, purgeAt:x.purgeAt}))
+  ];
+  scheduledWrap.innerHTML = scheduledItems.length ? scheduledItems.map(it=>`
+    <div class="emp-row"><div class="meta"><div class="name">${it.label}</div><div class="sub">${daysLeft(it.purgeAt)} din baad hamesha ke liye delete hoga</div></div></div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button class="btn btn-accept" data-restore="${it.kind}:${it.id}">Restore</button>
+    </div>
+  `).join('') : '<div class="empty">Kuch bhi scheduled nahi hai.</div>';
+
+  document.querySelectorAll('[data-restore]').forEach(b=>b.addEventListener('click', ()=>restoreItem(b.dataset.restore)));
+  document.querySelectorAll('[data-purge]').forEach(b=>b.addEventListener('click', ()=>schedulePurge(b.dataset.purge)));
+}
+
+async function restoreItem(key){
+  const [kind,id] = key.split(':');
+  if(kind==='attendance'){
+    await dbUpdate('attendance','key',id,{deleted_by:null, deleted_at:null, purge_at:null});
+    const idx = trashAttendance.findIndex(r=>r.key===id);
+    if(idx>-1){ const rec = trashAttendance.splice(idx,1)[0]; attendanceMap[id] = rec; }
+  } else {
+    await dbUpdate('expenses','id',id,{deleted_by:null, deleted_at:null, purge_at:null});
+    const idx = trashExpenses.findIndex(x=>x.id===id);
+    if(idx>-1){ const entry = trashExpenses.splice(idx,1)[0]; expenses.push(entry); }
+  }
+  renderTrashView(); renderDashboard();
+}
+
+async function schedulePurge(key){
+  if(!confirm('Ye entry 30 din ke baad hamesha ke liye delete ho jayegi. Confirm karein?')) return;
+  const [kind,id] = key.split(':');
+  const purgeAt = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+  if(kind==='attendance'){
+    await dbUpdate('attendance','key',id,{deleted_by:'admin', purge_at:purgeAt});
+    const rec = trashAttendance.find(r=>r.key===id);
+    if(rec){ rec.deletedBy='admin'; rec.purgeAt=purgeAt; }
+  } else {
+    await dbUpdate('expenses','id',id,{deleted_by:'admin', purge_at:purgeAt});
+    const entry = trashExpenses.find(x=>x.id===id);
+    if(entry){ entry.deletedBy='admin'; entry.purgeAt=purgeAt; }
+  }
+  renderTrashView();
+}
+
+async function adminDeleteAttendance(keys){
+  const purgeAt = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+  for(const key of keys){
+    await dbUpdate('attendance','key',key,{deleted_by:'admin', deleted_at:new Date().toISOString(), purge_at:purgeAt});
+    const rec = attendanceMap[key];
+    if(rec){ delete attendanceMap[key]; trashAttendance.push({...rec, deletedBy:'admin', purgeAt}); }
+  }
+  renderAttSheet(); renderDashboard();
+}
+async function adminDeleteExpenses(ids){
+  const purgeAt = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+  for(const id of ids){
+    await dbUpdate('expenses','id',id,{deleted_by:'admin', deleted_at:new Date().toISOString(), purge_at:purgeAt});
+    const idx = expenses.findIndex(x=>x.id===id);
+    if(idx>-1){ const entry = expenses.splice(idx,1)[0]; trashExpenses.push({...entry, deletedBy:'admin', purgeAt}); }
+  }
+  renderKhSheet(); renderDashboard();
+}
+
 function renderSettingsView(){
   document.getElementById('officeStartTime').value = officeStartTime;
+  document.getElementById('currentAdminLabel').textContent = 'Logged in as: ' + (currentAdminUsername || '');
   renderBranchList();
   renderUserList();
 }
 
+document.getElementById('changePassBtn').addEventListener('click', async ()=>{
+  const newPass = document.getElementById('changePassNew').value;
+  const confirmPass = document.getElementById('changePassConfirm').value;
+  const result = document.getElementById('changePassResult');
+  if(!newPass || newPass.length < 4){ result.className='result-banner err'; result.textContent='Password kam se kam 4 characters ka ho'; return; }
+  if(newPass !== confirmPass){ result.className='result-banner err'; result.textContent='Dono password match nahi kar rahe'; return; }
+  try{
+    await dbUpdate('app_users','username',currentAdminUsername,{password:newPass});
+    result.className='result-banner in'; result.textContent='Password update ho gaya.';
+    document.getElementById('changePassNew').value=''; document.getElementById('changePassConfirm').value='';
+  }catch(e){ result.className='result-banner err'; result.textContent='Failed: '+e.message; }
+});
+
 async function loadAndShowAdmin(){
   try{
     employees = await dbGetAll('employees');
+
     const attRows = await dbGetAll('attendance');
-    attRows.forEach(r=> attendanceMap[r.key] = {key:r.key, empId:r.emp_id, date:r.date, punches:r.punches||[]});
+    const nowMs = Date.now();
+    for(const r of attRows){
+      if(r.purge_at && new Date(r.purge_at).getTime() <= nowMs){
+        await dbDelete('attendance','key',r.key);
+        continue;
+      }
+      const rec = {key:r.key, empId:r.emp_id, date:r.date, punches:r.punches||[], branch_id:r.branch_id, deletedBy:r.deleted_by, deletedAt:r.deleted_at, purgeAt:r.purge_at};
+      if(r.deleted_by) trashAttendance.push(rec);
+      else attendanceMap[r.key] = rec;
+    }
+
     const expRows = await dbGetAll('expenses');
-    expenses = expRows.map(x=>({id:x.id, date:x.date, time:x.time, type:x.type, item:x.item, qty:x.qty, amount:Number(x.amount), empId:x.emp_id}));
+    for(const x of expRows){
+      if(x.purge_at && new Date(x.purge_at).getTime() <= nowMs){
+        await dbDelete('expenses','id',x.id);
+        continue;
+      }
+      const entry = {id:x.id, date:x.date, time:x.time, type:x.type, item:x.item, qty:x.qty, amount:Number(x.amount), empId:x.emp_id, deletedBy:x.deleted_by, deletedAt:x.deleted_at, purgeAt:x.purge_at};
+      if(x.deleted_by) trashExpenses.push(entry);
+      else expenses.push(entry);
+    }
+
     branches = await dbGetAll('branches');
     adminUsers = await dbGetAll('app_users');
     employeeRequests = (await dbGetAll('employee_requests')).filter(r=>r.status==='pending');
@@ -725,10 +943,15 @@ async function loadAndShowAdmin(){
     const settingsRows = await dbGetAll('settings');
     if(settingsRows.length) officeStartTime = settingsRows[0].office_start_time || '09:30';
 
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+
     document.getElementById('veil').style.display='none';
     document.getElementById('adminPanel').style.display='block';
     populateBranchSelect(document.getElementById('regBranch'));
     renderDashboard();
+    await initAdminRegisterCam();
   }catch(err){
     document.getElementById('veil').innerHTML = `<div style="padding:0 30px;text-align:center;font-family:'Courier New',monospace;font-size:13px;color:#A8432F;">Failed to load: ${err.message}<br><br>Check your internet connection and reload.</div>`;
   }
